@@ -13,8 +13,58 @@ const resultDiv = document.getElementById("result") as HTMLElement;
 const startButton = document.getElementById("startButton") as HTMLButtonElement;
 const restartButton = document.getElementById("restartButton") as HTMLButtonElement;
 
+const validateOcr = (): boolean => {
+  if (!ocrid) {
+    statusDiv.textContent = "Error: OCR not initialized.";
+    return false;
+  }
+  return true;
+};
+
+const handleError = (operation: string, error: any): void => {
+  console.error(`Error ${operation}:`, error);
+  statusDiv.textContent = `Error: ${error}`;
+};
+
 // Initialize OCR when the button is clicked
 initializeButton.addEventListener("click", () => {
+  startStream();
+});
+
+// Start the video stream
+startButton.addEventListener("click", () => {
+  if (!validateOcr()) return;
+
+  ocrid!.startStream(videoContainer)
+    .then((id) => {
+      console.log("Stream started.");
+      console.log('ID: ' + id);
+      processId = id as string ?? null;
+      statusDiv.textContent = "Stream started.";
+    })
+    .catch((err: any) => handleError("starting stream", err));
+});
+
+// Restart the OCR process
+restartButton.addEventListener("click", () => {
+  restartOcrComponent();
+});
+
+const restartOcrComponent = () => {
+  console.log('restarting ocr component automatically');
+
+  if (!validateOcr()) return;
+
+  ocrid!.restart()
+    .then(() => {
+      console.log("Process restarted.");
+      statusDiv.textContent = "Process restarted.";
+      resultDiv.textContent = "";
+    })
+    .catch((err: any) => handleError("restarting process", err));
+}
+
+const startStream = () => {
   const token = tokenInput.value.trim();
 
   if (!token) {
@@ -40,7 +90,7 @@ initializeButton.addEventListener("click", () => {
           break;
         case EventTypeUserFeedback.PROCESS_FAILED_DUE_ANALYSIS_ERROR:
           console.error("Process failed due to an analysis error.");
-          ocrid!.restart();
+          restartOcrComponent();
           break;
         case EventTypeUserFeedback.PROCESS_FINISHED:
           console.log("Scanning process finished.");
@@ -71,43 +121,4 @@ initializeButton.addEventListener("click", () => {
     console.error("Error initializing OCR:", error);
     statusDiv.textContent = "Error initializing OCR.";
   }
-});
-
-// Start the video stream
-startButton.addEventListener("click", () => {
-  if (!ocrid) {
-    statusDiv.textContent = "Error: OCR not initialized.";
-    return;
-  }
-
-  ocrid.startStream(videoContainer)
-    .then((id) => {
-      console.log("Stream started.");
-      console.log('ID: ' + id);
-      processId = id as string ?? null;
-      statusDiv.textContent = "Stream started.";
-    })
-    .catch((err: any) => {
-      console.error("Error starting stream:", err);
-      statusDiv.textContent = `Error: ${err}`;
-    });
-});
-
-// Restart the OCR process
-restartButton.addEventListener("click", () => {
-  if (!ocrid) {
-    statusDiv.textContent = "Error: OCR not initialized.";
-    return;
-  }
-
-  ocrid.restart()
-    .then(() => {
-      console.log("Process restarted.");
-      statusDiv.textContent = "Process restarted.";
-      resultDiv.textContent = "";
-    })
-    .catch((err: any) => {
-      console.error("Error restarting process:", err);
-      statusDiv.textContent = `Error: ${err}`;
-    });
-});
+}
