@@ -1,4 +1,4 @@
-import { OcrId, EventType, Envs, EventTypeUserFeedback } from 'fw-ocrid';
+import { OcrId, EventType, Envs, EventTypeUserFeedback, IConfiguration } from 'fw-ocrid';
 
 let ocrid: OcrId | null = null;
 let processId: string | null = null;
@@ -9,7 +9,6 @@ const statusDiv = document.getElementById("status") as HTMLElement;
 const tokenInputContainer = document.getElementById("tokenInputContainer") as HTMLElement;
 const controlsDiv = document.getElementById("controls") as HTMLElement;
 const videoContainer = document.getElementById("videoContainer") as HTMLElement;
-const resultDiv = document.getElementById("result") as HTMLElement;
 const startButton = document.getElementById("startButton") as HTMLButtonElement;
 const restartButton = document.getElementById("restartButton") as HTMLButtonElement;
 
@@ -47,22 +46,8 @@ startButton.addEventListener("click", () => {
 
 // Restart the OCR process
 restartButton.addEventListener("click", () => {
-  restartOcrComponent();
+  ocrid!.restart();
 });
-
-const restartOcrComponent = () => {
-  console.log('restarting ocr component automatically');
-
-  if (!validateOcr()) return;
-
-  ocrid!.restart()
-    .then(() => {
-      console.log("Process restarted.");
-      statusDiv.textContent = "Process restarted.";
-      resultDiv.textContent = "";
-    })
-    .catch((err: any) => handleError("restarting process", err));
-}
 
 const startStream = () => {
   const token = tokenInput.value.trim();
@@ -72,8 +57,30 @@ const startStream = () => {
     return;
   }
 
+  const config = {} as IConfiguration;
+  
+  /**
+   * Configuration options for OCR processing optimization:
+   * 
+   * multipageProcessing (boolean, default: true):
+   * - Set to false if you only need to scan the front side of documents
+   * - Disabling multipage processing reduces processing time significantly
+   * - Useful for single-sided documents or when back side scanning is not required
+   * Example: config.multipageProcessing = false;
+   * 
+   * skipDocumentAnalysis (boolean, default: false):
+   * - Set to true to bypass client-side document analysis and capture photos directly
+   * - When enabled: OCR and document analysis are performed ONLY on the API server
+   * - When disabled: Client performs pre-analysis before sending to API
+   * - BENEFIT: Faster photo capture and reduced client-side processing
+   * - WARNING: May result in processing issues if image quality is poor, since
+   *   the client won't validate the document before sending to the API
+   * - Recommended only when you have high-quality, well-lit document images
+   * Example: config.skipDocumentAnalysis = true;
+   */
+
   try {
-    ocrid = new OcrId(token, Envs.PRE3);
+    ocrid = new OcrId(token, Envs.PRE3, config);
 
     // Subscribe to feedback events
     ocrid.events(EventType.USER_FEEDBACK).subscribe((feedback: any) => {
@@ -90,7 +97,7 @@ const startStream = () => {
           break;
         case EventTypeUserFeedback.PROCESS_FAILED_DUE_ANALYSIS_ERROR:
           console.error("Process failed due to an analysis error.");
-          restartOcrComponent();
+          ocrid!.restart();
           break;
         case EventTypeUserFeedback.PROCESS_FINISHED:
           console.log("Scanning process finished.");
